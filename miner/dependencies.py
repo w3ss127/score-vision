@@ -49,12 +49,12 @@ async def blacklist_low_stake(
     metagraph = config.metagraph
     metagraph.sync_nodes()
     node = metagraph.nodes.get(validator_hotkey)
-    logger.info(f"Node {validator_hotkey} has TAO stake {node.tao_stake}")
-    logger.info(f"Node full object: {node}")
-    if not node:
-        raise HTTPException(status_code=403, detail="Hotkey not found in metagraph")
+    # logger.info(f"Node {validator_hotkey} has TAO stake {node.tao_stake}")
+    # logger.info(f"Node full object: {node}")
+    # if not node:
+    #     raise HTTPException(status_code=403, detail="Hotkey not found in metagraph")
 
-    if node.tao_stake < config.min_stake_threshold:
-        logger.debug(f"Node {validator_hotkey} has insufficient stake of {node.tao_stake} - minimum is {config.min_stake_threshold}")
-        raise HTTPException(status_code=403, detail=f"Insufficient stake of {node.tao_stake} - minimum is {config.min_stake_threshold}  ") 
+    # if node.tao_stake < config.min_stake_threshold:
+    #     logger.debug(f"Node {validator_hotkey} has insufficient stake of {node.tao_stake} - minimum is {config.min_stake_threshold}")
+    #     raise HTTPException(status_code=403, detail=f"Insufficient stake of {node.tao_stake} - minimum is {config.min_stake_threshold}  ") 
    

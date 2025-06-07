@@ -229,6 +229,7 @@ validator/evaluation/tests/train-well-annotated.jpg
 validator/tests/test_frame_19_evaluation.py
 validator/examples/
 
+miner/challenge_outputs/
 miner/test_outputs/
 miner/data/
 

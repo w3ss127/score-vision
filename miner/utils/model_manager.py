@@ -4,7 +4,7 @@ from ultralytics import YOLO
 from loguru import logger
 
 from miner.utils.device import get_optimal_device
-from scripts.download_models import download_models
+from miner.scripts.download_models import download_models
 
 class ModelManager:
     """Manages the loading and caching of YOLO models."""
