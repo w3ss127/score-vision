@@ -1,6 +1,6 @@
 import asyncio
 import time
-from typing import AsyncGenerator, Optional, Tuple
+from typing import Generator, Optional, Tuple
 import cv2
 import numpy as np
 import supervision as sv
@@ -8,7 +8,7 @@ from loguru import logger
 
 class VideoProcessor:
     """Handles video processing with frame streaming and timeout management."""
-    
+
     def __init__(
         self,
         device: str = "cpu",
@@ -24,29 +24,28 @@ class VideoProcessor:
             self.processing_timeout = mps_timeout
         else:  # cpu or any other device
             self.processing_timeout = cpu_timeout
-            
-        logger.info(f"Video processor initialized with {device} device, timeout: {self.processing_timeout:.1f}s")
-    
-    async def stream_frames(
-        self,
-        video_path: str
-    ) -> AsyncGenerator[Tuple[int, np.ndarray], None]:
+
+        logger.info(
+            f"Video processor initialized with {device} device, timeout: {self.processing_timeout:.1f}s"
+        )
+
+    def stream_frames(self, video_path: str) -> Generator[Tuple[int, np.ndarray], None, None]:
         """
         Stream video frames asynchronously with timeout protection.
         Process ALL frames regardless of compute device.
-        
+
         Args:
             video_path: Path to the video file
-            
+
         Yields:
             Tuple[int, np.ndarray]: Frame number and frame data
         """
         start_time = time.time()
         cap = cv2.VideoCapture(str(video_path))
-        
+
         if not cap.isOpened():
             raise ValueError(f"Could not open video file: {video_path}")
-        
+
         try:
             frame_count = 0
             while True:
@@ -57,43 +56,43 @@ class VideoProcessor:
                         f"on {self.device} device ({frame_count} frames processed)"
                     )
                     break
-                
+
                 # Use run_in_executor to prevent blocking the event loop
-                ret, frame = await asyncio.get_event_loop().run_in_executor(
-                    None, cap.read
-                )
-                
+                ret, frame = cap.read()
+
                 if not ret:
-                    logger.info(f"Completed processing {frame_count} frames in {elapsed_time:.1f}s on {self.device} device")
+                    logger.info(
+                        f"Completed processing {frame_count} frames in {elapsed_time:.1f}s on {self.device} device"
+                    )
                     break
                 
+                frame = cv2.resize(frame, (640, 360))
+
                 yield frame_count, frame
                 frame_count += 1
-                
-                # Small delay to prevent CPU hogging while still processing all frames
-                await asyncio.sleep(0)
-        
+
         finally:
             cap.release()
-    
+
     @staticmethod
     def get_video_info(video_path: str) -> sv.VideoInfo:
         """Get video information using supervision."""
         return sv.VideoInfo.from_video_path(video_path)
-    
+
     @staticmethod
     async def ensure_video_readable(video_path: str, timeout: float = 5.0) -> bool:
         """
         Check if video is readable within timeout period.
-        
+
         Args:
             video_path: Path to video file
             timeout: Maximum time to wait for video check
-            
+
         Returns:
             bool: True if video is readable
         """
         try:
+
             async def _check_video():
                 cap = cv2.VideoCapture(str(video_path))
                 if not cap.isOpened():
@@ -101,12 +100,12 @@ class VideoProcessor:
                 ret, _ = cap.read()
                 cap.release()
                 return ret
-            
+
             return await asyncio.wait_for(_check_video(), timeout)
-        
+
         except asyncio.TimeoutError:
             logger.error(f"Timeout while checking video readability: {video_path}")
             return False
         except Exception as e:
             logger.error(f"Error checking video readability: {str(e)}")
-            return False 
+            return False

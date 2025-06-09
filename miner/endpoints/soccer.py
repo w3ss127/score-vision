@@ -2,6 +2,8 @@ import os
 import json
 import time
 import random
+import queue
+import threading
 from typing import Optional, Dict, Any
 import supervision as sv
 import numpy as np
@@ -42,40 +44,46 @@ async def process_soccer_video(
     video_path: str,
     model_manager: ModelManager,
 ) -> Dict[str, Any]:
-    """Process a soccer video and return tracking data."""
+    """Process a soccer video and return tracking data with threaded frame loading."""
     start_time = time.time()
+    frame_queue = queue.Queue(maxsize=32)  # Tune maxsize for your memory
+
+    def frame_loader():
+        try:
+            for frame_number, frame in VideoProcessor(
+                device=model_manager.device
+            ).stream_frames(video_path):
+                frame_queue.put((frame_number, frame))
+            frame_queue.put(None)  # Sentinel to signal end
+        except Exception as e:
+            frame_queue.put(e)
+
+    loader_thread = threading.Thread(target=frame_loader, daemon=True)
+    loader_thread.start()
 
     try:
-        video_processor = VideoProcessor(
-            device=model_manager.device,
-            cuda_timeout=10800.0,
-            mps_timeout=10800.0,
-            cpu_timeout=10800.0,
-        )
-
-        if not await video_processor.ensure_video_readable(video_path):
-            raise HTTPException(
-                status_code=400, detail="Video file is not readable or corrupted"
-            )
-
         player_model = model_manager.get_model("player")
         pitch_model = model_manager.get_model("pitch")
-
         tracker = sv.ByteTrack()
-
         tracking_data = {"frames": []}
 
-        async for frame_number, frame in video_processor.stream_frames(video_path):
+        while True:
+            item = frame_queue.get()
+            if item is None:
+                break
+            if isinstance(item, Exception):
+                raise item
+            frame_number, frame = item
+
             pitch_result = pitch_model(frame, verbose=False)[0]
             keypoints = sv.KeyPoints.from_ultralytics(pitch_result)
 
-            player_result = player_model(frame, imgsz=1280, verbose=False)[0]
+            player_result = player_model(frame, imgsz=640, verbose=False)[0]
             detections = sv.Detections.from_ultralytics(player_result)
             detections = tracker.update_with_detections(detections)
 
-            # Convert numpy arrays to Python native types
             frame_data = {
-                "frame_number": int(frame_number),  # Convert to native int
+                "frame_number": int(frame_number),
                 "keypoints": (
                     keypoints.xy[0].tolist()
                     if keypoints and keypoints.xy is not None
@@ -84,13 +92,9 @@ async def process_soccer_video(
                 "objects": (
                     [
                         {
-                            "id": int(tracker_id),  # Convert numpy.int64 to native int
-                            "bbox": [
-                                float(x) for x in bbox
-                            ],  # Convert numpy.float32/64 to native float
-                            "class_id": int(
-                                class_id
-                            ),  # Convert numpy.int64 to native int
+                            "id": int(tracker_id),
+                            "bbox": [float(x) for x in bbox],
+                            "class_id": int(class_id),
                         }
                         for tracker_id, bbox, class_id in zip(
                             detections.tracker_id, detections.xyxy, detections.class_id
