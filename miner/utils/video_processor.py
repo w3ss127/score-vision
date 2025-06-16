@@ -66,7 +66,7 @@ class VideoProcessor:
                     )
                     break
                 
-                frame = cv2.resize(frame, (640, 360))
+                # frame = cv2.resize(frame, (640, 360))
 
                 yield frame_count, frame
                 frame_count += 1

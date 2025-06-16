@@ -5,6 +5,7 @@ import os
 import sys
 from pathlib import Path
 import time
+import json
 from loguru import logger
 from typing import List, Dict, Union
 
@@ -103,6 +104,13 @@ async def main():
             output_dir.mkdir(exist_ok=True)
             
             output_file = output_dir / f"pipeline_test_results_{int(time.time())}.json"
+            read_file = output_dir / f"pipeline_test_results_1749967723.json"
+            
+            try:
+                with open(read_file, "r") as f:
+                    data = json.load(f)
+            except (FileNotFoundError, json.JSONDecodeError) as e:
+                print(f"Error reading JSON: {e}")
             
             result_json = json.dumps(optimized_result)
             data_size = len(result_json) / 1024
